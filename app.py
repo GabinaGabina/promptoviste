@@ -31,19 +31,42 @@ def export_to_json():
     data = load_data()
     return json.dumps(data, ensure_ascii=False, indent=2)
 
-# Načtení dat
+# Inicializace session state
 if 'prompts' not in st.session_state:
     st.session_state.prompts = load_data()
+if 'admin_logged_in' not in st.session_state:
+    st.session_state.admin_logged_in = False
 
 prompts = st.session_state.prompts
 
 # Hlavička
 st.title("🤖 Promptoviště")
 st.markdown("*Sdílená kolekce užitečných promptů pro vzdělávání, marketing a další oblasti*")
+
+# Admin login v postranním panelu
+with st.sidebar:
+    st.header("Admin přístup")
+    if not st.session_state.admin_logged_in:
+        admin_password = st.text_input("Heslo", type="password", key="admin_pass")
+        if st.button("Přihlásit"):
+            if admin_password == "promptmaster":
+                st.session_state.admin_logged_in = True
+                st.rerun()
+            else:
+                st.error("Nesprávné heslo")
+    else:
+        st.success("Přihlášen jako admin")
+        if st.button("Odhlásit"):
+            st.session_state.admin_logged_in = False
+            st.rerun()
+
 st.markdown("---")
 
 # Rozdělení na záložky
-tab1, tab2, tab3, tab4 = st.tabs(["📚 Procházet prompty", "📂 Kategorie & Tagy", "➕ Přidat prompt (Admin)", "ℹ️ O projektu"])
+if st.session_state.admin_logged_in:
+    tab1, tab2, tab3, tab4 = st.tabs(["📚 Procházet prompty", "📂 Kategorie & Tagy", "➕ Přidat prompt", "ℹ️ O projektu"])
+else:
+    tab1, tab2, tab3 = st.tabs(["📚 Procházet prompty", "📂 Kategorie & Tagy", "ℹ️ O projektu"])
 
 # Záložka 1: Procházet prompty
 with tab1:
@@ -107,75 +130,80 @@ with tab1:
                 if prompt.get('tagy'):
                     st.markdown(f"🏷️ **Tagy:** {', '.join(prompt['tagy'])}")
                 
-                # Tlačítka pro akce
-                col1, col2, col3, col4 = st.columns([1, 1, 1, 3])
-                
-                with col1:
-                    if st.button("📋 Kopírovat", key=f"copy_{prompt_index}"):
-                        st.success("✅ Zkopírováno!")
-                
-                with col2:
-                    if st.button("✏️ Editovat", key=f"edit_{prompt_index}"):
-                        st.session_state[f'editing_{prompt_index}'] = True
-                        st.rerun()
-                
-                with col3:
-                    if st.button("🗑️ Smazat", key=f"delete_{prompt_index}"):
-                        st.session_state[f'confirm_delete_{prompt_index}'] = True
-                        st.rerun()
-                
-                # Potvrzení smazání
-                if st.session_state.get(f'confirm_delete_{prompt_index}', False):
-                    st.warning("⚠️ Opravdu chceš smazat tento prompt?")
-                    col_yes, col_no = st.columns(2)
-                    with col_yes:
-                        if st.button("✅ Ano, smazat", key=f"confirm_yes_{prompt_index}"):
-                            st.session_state.prompts.pop(prompt_index)
-                            save_data(st.session_state.prompts)
-                            st.session_state[f'confirm_delete_{prompt_index}'] = False
-                            st.success("🗑️ Prompt byl smazán!")
-                            st.rerun()
-                    with col_no:
-                        if st.button("❌ Ne, zrušit", key=f"confirm_no_{prompt_index}"):
-                            st.session_state[f'confirm_delete_{prompt_index}'] = False
-                            st.rerun()
-                
-                # Editační formulář
-                if st.session_state.get(f'editing_{prompt_index}', False):
-                    st.markdown("---")
-                    st.markdown("**✏️ Editovat prompt:**")
+                # Tlačítka - zobrazí se podle toho, jestli je admin přihlášen
+                if st.session_state.admin_logged_in:
+                    col1, col2, col3, col4 = st.columns([1, 1, 1, 3])
                     
-                    with st.form(f"edit_form_{prompt_index}"):
-                        new_nazev = st.text_input("Název", value=prompt['nazev'])
-                        new_kategorie = st.text_input("Kategorie", value=prompt.get('kategorie', ''))
-                        new_popis = st.text_area("Popis", value=prompt.get('popis', ''))
-                        new_text = st.text_area("Text promptu", value=prompt['text'], height=200)
-                        new_tagy = st.text_input("Tagy (oddělené čárkou)", 
-                                                value=', '.join(prompt.get('tagy', [])))
-                        
-                        col_save, col_cancel = st.columns(2)
-                        with col_save:
-                            save_btn = st.form_submit_button("💾 Uložit změny")
-                        with col_cancel:
-                            cancel_btn = st.form_submit_button("❌ Zrušit")
-                        
-                        if save_btn:
-                            st.session_state.prompts[prompt_index] = {
-                                'nazev': new_nazev,
-                                'kategorie': new_kategorie,
-                                'popis': new_popis,
-                                'text': new_text,
-                                'tagy': [t.strip() for t in new_tagy.split(',') if t.strip()],
-                                'datum': prompt.get('datum', datetime.now().strftime("%d.%m.%Y"))
-                            }
-                            save_data(st.session_state.prompts)
-                            st.session_state[f'editing_{prompt_index}'] = False
-                            st.success("✅ Změny uloženy!")
+                    with col1:
+                        if st.button("📋 Kopírovat", key=f"copy_{prompt_index}"):
+                            st.success("✅ Zkopírováno!")
+                    
+                    with col2:
+                        if st.button("✏️ Editovat", key=f"edit_{prompt_index}"):
+                            st.session_state[f'editing_{prompt_index}'] = True
                             st.rerun()
-                        
-                        if cancel_btn:
-                            st.session_state[f'editing_{prompt_index}'] = False
+                    
+                    with col3:
+                        if st.button("🗑️ Smazat", key=f"delete_{prompt_index}"):
+                            st.session_state[f'confirm_delete_{prompt_index}'] = True
                             st.rerun()
+                    
+                    # Potvrzení smazání
+                    if st.session_state.get(f'confirm_delete_{prompt_index}', False):
+                        st.warning("⚠️ Opravdu chceš smazat tento prompt?")
+                        col_yes, col_no = st.columns(2)
+                        with col_yes:
+                            if st.button("✅ Ano, smazat", key=f"confirm_yes_{prompt_index}"):
+                                st.session_state.prompts.pop(prompt_index)
+                                save_data(st.session_state.prompts)
+                                st.session_state[f'confirm_delete_{prompt_index}'] = False
+                                st.success("🗑️ Prompt byl smazán!")
+                                st.rerun()
+                        with col_no:
+                            if st.button("❌ Ne, zrušit", key=f"confirm_no_{prompt_index}"):
+                                st.session_state[f'confirm_delete_{prompt_index}'] = False
+                                st.rerun()
+                    
+                    # Editační formulář
+                    if st.session_state.get(f'editing_{prompt_index}', False):
+                        st.markdown("---")
+                        st.markdown("**✏️ Editovat prompt:**")
+                        
+                        with st.form(f"edit_form_{prompt_index}"):
+                            new_nazev = st.text_input("Název", value=prompt['nazev'])
+                            new_kategorie = st.text_input("Kategorie", value=prompt.get('kategorie', ''))
+                            new_popis = st.text_area("Popis", value=prompt.get('popis', ''))
+                            new_text = st.text_area("Text promptu", value=prompt['text'], height=200)
+                            new_tagy = st.text_input("Tagy (oddělené čárkou)", 
+                                                    value=', '.join(prompt.get('tagy', [])))
+                            
+                            col_save, col_cancel = st.columns(2)
+                            with col_save:
+                                save_btn = st.form_submit_button("💾 Uložit změny")
+                            with col_cancel:
+                                cancel_btn = st.form_submit_button("❌ Zrušit")
+                            
+                            if save_btn:
+                                st.session_state.prompts[prompt_index] = {
+                                    'nazev': new_nazev,
+                                    'kategorie': new_kategorie,
+                                    'popis': new_popis,
+                                    'text': new_text,
+                                    'tagy': [t.strip() for t in new_tagy.split(',') if t.strip()],
+                                    'datum': prompt.get('datum', datetime.now().strftime("%d.%m.%Y"))
+                                }
+                                save_data(st.session_state.prompts)
+                                st.session_state[f'editing_{prompt_index}'] = False
+                                st.success("✅ Změny uloženy!")
+                                st.rerun()
+                            
+                            if cancel_btn:
+                                st.session_state[f'editing_{prompt_index}'] = False
+                                st.rerun()
+                else:
+                    # Pro běžné uživatele jen tlačítko kopírovat
+                    if st.button("📋 Kopírovat", key=f"copy_{prompt_index}"):
+                        st.success("✅ Text promptu zkopírován!")
 
 # Záložka 2: Kategorie & Tagy
 with tab2:
@@ -225,15 +253,10 @@ with tab2:
                     if prompt.get('popis'):
                         st.markdown(f"  *{prompt['popis'][:100]}{'...' if len(prompt.get('popis', '')) > 100 else ''}*")
 
-# Záložka 3: Přidat prompt
-with tab3:
-    st.header("Přidat nový prompt")
-    
-    # Jednoduché heslo pro admin
-    admin_password = st.text_input("🔐 Admin heslo", type="password")
-    
-    if admin_password == "promptmaster":
-        st.success("✅ Přihlášen jako admin")
+# Záložka 3: Přidat prompt (pouze pro admina)
+if st.session_state.admin_logged_in:
+    with tab3:
+        st.header("Přidat nový prompt")
         
         with st.form("add_prompt"):
             nazev = st.text_input("Název promptu *", placeholder="např. The Blindspot Cartographer")
@@ -262,33 +285,39 @@ with tab3:
                     st.rerun()
                 else:
                     st.error("⚠️ Vyplň prosím všechna povinná pole (označená *)")
-    
-    elif admin_password:
-        st.error("❌ Nesprávné heslo")
-    else:
-        st.info("🔐 Pro přidání nového promptu zadej admin heslo")
 
-# Záložka 4: O projektu
-with tab4:
-    st.header("O Promptovišti")
-    st.markdown("""
-    **Promptoviště** je sdílená databáze užitečných promptů pro práci s AI.
-    
-    ### Jak používat:
-    1. **Procházej prompty** v záložce "Procházet prompty"
-    2. **Vyhledávej** podle klíčových slov nebo filtruj podle kategorií
-    3. **Prohlížej kategorie a tagy** pro inspiraci a objevování
-    4. **Kopíruj** prompty a používej je ve svých AI konverzacích
-    5. **Edituj nebo maž** prompty podle potřeby
-    6. **Exportuj** celou databázi do JSON souboru pro zálohu
-    
-    ### Pro administrátory:
-    - V záložce "Přidat prompt" můžeš přidávat nové prompty
-    - Používej heslo: `promptmaster`
-    
-    ---
-    *Vytvořeno s pomocí Claude & Streamlit 🤖*
-    """)
+# Záložka O projektu
+if st.session_state.admin_logged_in:
+    with tab4:
+        st.header("O Promptovišti")
+        st.markdown("""
+        **Promptoviště** je sdílená databáze užitečných promptů pro práci s AI.
+        
+        ### Jak používat:
+        1. **Procházej prompty** v záložce "Procházet prompty"
+        2. **Vyhledávej** podle klíčových slov nebo filtruj podle kategorií
+        3. **Prohlížej kategorie a tagy** pro inspiraci a objevování
+        4. **Kopíruj** prompty a používej je ve svých AI konverzacích
+        5. **Exportuj** celou databázi do JSON souboru pro zálohu
+        
+        ---
+        *Vytvořeno s pomocí Claude & Streamlit 🤖*
+        """)
+else:
+    with tab3:
+        st.header("O Promptovišti")
+        st.markdown("""
+        **Promptoviště** je sdílená databáze užitečných promptů pro práci s AI.
+        
+        ### Jak používat:
+        1. **Procházej prompty** v záložce "Procházet prompty"
+        2. **Vyhledávej** podle klíčových slov nebo filtruj podle kategorií
+        3. **Prohlížej kategorie a tagy** pro inspiraci a objevování
+        4. **Kopíruj** prompty a používej je ve svých AI konverzacích
+        
+        ---
+        *Vytvořeno s pomocí Claude & Streamlit 🤖*
+        """)
 
 # Footer
 st.markdown("---")
