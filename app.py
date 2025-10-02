@@ -246,12 +246,26 @@ with tab2:
                     
                     st.markdown("---")
                 
-                # Seznam promptů v kategorii
+                # Seznam promptů v kategorii - nyní jako klikatelné expandery
                 st.markdown("**📝 Prompty:**")
-                for prompt in data['prompts']:
-                    st.markdown(f"• **{prompt['nazev']}**")
-                    if prompt.get('popis'):
-                        st.markdown(f"  *{prompt['popis'][:100]}{'...' if len(prompt.get('popis', '')) > 100 else ''}*")
+                for prompt_cat in data['prompts']:
+                    # Najdeme index v původním seznamu
+                    prompt_index_cat = prompts.index(prompt_cat)
+                    
+                    with st.expander(f"**{prompt_cat['nazev']}**"):
+                        if prompt_cat.get('popis'):
+                            st.markdown(f"*{prompt_cat['popis']}*")
+                            st.markdown("")
+                        
+                        st.markdown("**Prompt:**")
+                        st.code(prompt_cat['text'], language=None)
+                        
+                        if prompt_cat.get('tagy'):
+                            st.markdown(f"🏷️ **Tagy:** {', '.join(prompt_cat['tagy'])}")
+                        
+                        # Tlačítko kopírovat pro všechny
+                        if st.button("📋 Kopírovat", key=f"copy_cat_{category}_{prompt_index_cat}"):
+                            st.success("✅ Text promptu zkopírován!")
 
 # Záložka 3: Přidat prompt (pouze pro admina)
 if st.session_state.admin_logged_in:
