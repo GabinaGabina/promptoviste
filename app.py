@@ -335,4 +335,4 @@ else:
 
 # Footer
 st.markdown("---")
-st.markdown("*Máš nápad na vylepšení? Napiš administrátorovi!*")
+st.markdown("*Máš nápad na vylepšení? Napiš Administrátorovi!*")
