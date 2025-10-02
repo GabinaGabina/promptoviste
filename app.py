@@ -36,8 +36,6 @@ if 'prompts' not in st.session_state:
     st.session_state.prompts = load_data()
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
-if 'current_tab' not in st.session_state:
-    st.session_state.current_tab = 0
 
 prompts = st.session_state.prompts
 
@@ -67,14 +65,8 @@ st.markdown("---")
 # Rozdělení na záložky
 if st.session_state.admin_logged_in:
     tab1, tab2, tab3, tab4 = st.tabs(["📚 Procházet prompty", "📂 Kategorie & Tagy", "➕ Přidat prompt", "ℹ️ O projektu"])
-    tabs = [tab1, tab2, tab3, tab4]
 else:
     tab1, tab2, tab3 = st.tabs(["📚 Procházet prompty", "📂 Kategorie & Tagy", "ℹ️ O projektu"])
-    tabs = [tab1, tab2, tab3]
-
-# Detekce změny záložky - resetuje expandery v kategorii
-# Streamlit automaticky spustí celý skript znovu při změně záložky
-# Takže expandery se automaticky zavřou, ale musíme jim nastavit expanded=False
 
 # Záložka 1: Procházet prompty
 with tab1:
@@ -233,14 +225,11 @@ with tab2:
         # Seřazení kategorií podle abecedy
         sorted_categories = sorted(categories_data.keys())
         
-        # Zobrazení kategorií - používáme unikátní klíče které se změní při každém načtení
-        for idx, category in enumerate(sorted_categories):
+        # Zobrazení kategorií
+        for category in sorted_categories:
             data = categories_data[category]
             
-            # Generujeme unikátní klíč pro každý expander, který se mění s časem
-            unique_key = f"cat_{category}_{datetime.now().timestamp()}"
-            
-            with st.expander(f"**{category}** ({data['count']} {'prompt' if data['count'] == 1 else 'prompty' if data['count'] < 5 else 'promptů'})", expanded=False, key=unique_key):
+            with st.expander(f"**{category}** ({data['count']} {'prompt' if data['count'] == 1 else 'prompty' if data['count'] < 5 else 'promptů'})", expanded=False):
                 
                 # Tagy v této kategorii
                 if data['tags']:
