@@ -233,11 +233,14 @@ with tab2:
         # Seřazení kategorií podle abecedy
         sorted_categories = sorted(categories_data.keys())
         
-        # Zobrazení kategorií - expanded=False zajistí, že budou zavřené při každém načtení záložky
-        for category in sorted_categories:
+        # Zobrazení kategorií - používáme unikátní klíče které se změní při každém načtení
+        for idx, category in enumerate(sorted_categories):
             data = categories_data[category]
             
-            with st.expander(f"**{category}** ({data['count']} {'prompt' if data['count'] == 1 else 'prompty' if data['count'] < 5 else 'promptů'})", expanded=False):
+            # Generujeme unikátní klíč pro každý expander, který se mění s časem
+            unique_key = f"cat_{category}_{datetime.now().timestamp()}"
+            
+            with st.expander(f"**{category}** ({data['count']} {'prompt' if data['count'] == 1 else 'prompty' if data['count'] < 5 else 'promptů'})", expanded=False, key=unique_key):
                 
                 # Tagy v této kategorii
                 if data['tags']:
