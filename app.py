@@ -242,13 +242,28 @@ with tab2:
                         with cols[col_idx]:
                             # Počet promptů s tímto tagem v této kategorii
                             tag_count = sum(1 for p in data['prompts'] if tag in p.get('tagy', []))
-                            st.button(f"🏷️ {tag} ({tag_count})", key=f"tag_{category}_{tag}", use_container_width=True)
+                            if st.button(f"🏷️ {tag} ({tag_count})", key=f"tag_{category}_{tag}", use_container_width=True):
+                                st.session_state[f'selected_tag_{category}'] = tag
                     
                     st.markdown("---")
                 
-                # Seznam promptů v kategorii - nyní jako klikatelné expandery
-                st.markdown("**📝 Prompty:**")
-                for prompt_cat in data['prompts']:
+                # Zjistíme, jestli je vybraný nějaký tag
+                selected_tag = st.session_state.get(f'selected_tag_{category}', None)
+                
+                # Filtrování promptů podle vybraného tagu
+                prompts_to_show = data['prompts']
+                if selected_tag:
+                    prompts_to_show = [p for p in data['prompts'] if selected_tag in p.get('tagy', [])]
+                    st.markdown(f"**📝 Prompty s tagem '{selected_tag}':** ({len(prompts_to_show)})")
+                    # Tlačítko pro reset filtru
+                    if st.button("✖️ Zobrazit všechny prompty", key=f"reset_{category}"):
+                        st.session_state[f'selected_tag_{category}'] = None
+                        st.rerun()
+                else:
+                    st.markdown("**📝 Všechny prompty:**")
+                
+                # Seznam promptů - nyní filtrované podle tagu
+                for prompt_cat in prompts_to_show:
                     # Najdeme index v původním seznamu
                     prompt_index_cat = prompts.index(prompt_cat)
                     
@@ -264,7 +279,7 @@ with tab2:
                             st.markdown(f"🏷️ **Tagy:** {', '.join(prompt_cat['tagy'])}")
                         
                         # Tlačítko kopírovat pro všechny
-                        if st.button("📋 Kopírovat", key=f"copy_cat_{category}_{prompt_index_cat}"):
+                        if st.button("📋 Kopírovat", key=f"copy_cat_{category}_{prompt_index_cat}_{selected_tag}"):
                             st.success("✅ Text promptu zkopírován!")
 
 # Záložka 3: Přidat prompt (pouze pro admina)
@@ -335,4 +350,4 @@ else:
 
 # Footer
 st.markdown("---")
-st.markdown("*Máš nápad na vylepšení? Napiš Administrátorovi!*")
+st.markdown("*Máš nápad na vylepšení? Napiš administrátorovi!*")
