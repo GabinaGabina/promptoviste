@@ -11,8 +11,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# Soubor pro ukládání dat
+# Soubory pro ukládání dat
 DATA_FILE = "prompty.json"
+STATS_FILE = "stats.json"
 
 # Funkce pro načtení dat
 def load_data():
@@ -31,13 +32,35 @@ def export_to_json():
     data = load_data()
     return json.dumps(data, ensure_ascii=False, indent=2)
 
+# Funkce pro statistiky
+def load_stats():
+    if os.path.exists(STATS_FILE):
+        with open(STATS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {"visits": 0, "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+def save_stats(stats):
+    with open(STATS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(stats, f, ensure_ascii=False, indent=2)
+
+def increment_visits():
+    stats = load_stats()
+    stats["visits"] += 1
+    stats["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    save_stats(stats)
+    return stats["visits"]
+
 # Inicializace session state
 if 'prompts' not in st.session_state:
     st.session_state.prompts = load_data()
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
+if 'visit_counted' not in st.session_state:
+    st.session_state.visit_counted = False
+    st.session_state.current_visits = increment_visits()
 
 prompts = st.session_state.prompts
+current_visits = st.session_state.current_visits
 
 # Hlavička
 st.title("🤖 Promptoviště")
@@ -59,6 +82,12 @@ with st.sidebar:
         if st.button("Odhlásit"):
             st.session_state.admin_logged_in = False
             st.rerun()
+    
+    # Statistiky pro admina
+    if st.session_state.admin_logged_in:
+        st.markdown("---")
+        st.markdown("**📊 Statistiky**")
+        st.metric("Celkový počet návštěv", f"{current_visits:,}")
 
 st.markdown("---")
 
@@ -329,8 +358,12 @@ if st.session_state.admin_logged_in:
         4. **Kopíruj** prompty a používej je ve svých AI konverzacích
         5. **Exportuj** celou databázi do JSON souboru pro zálohu
         
+        ### Kontakt a zpětná vazba:
+        Máš nápad na vylepšení nebo zpětnou vazbu k promptům?  
+        Napiš na: **promptoviste@gmail.com**
+        
         ---
-        *Vytvořeno s pomocí Claude & Streamlit 🤖*
+        *Vytvořeno v říjnu 2025*
         """)
 else:
     with tab3:
@@ -344,8 +377,12 @@ else:
         3. **Prohlížej kategorie a tagy** pro inspiraci a objevování
         4. **Kopíruj** prompty a používej je ve svých AI konverzacích
         
+        ### Kontakt a zpětná vazba:
+        Máš nápad na vylepšení nebo zpětnou vazbu k promptům?  
+        Napiš na: **promptoviste@gmail.com**
+        
         ---
-        *Vytvořeno s pomocí Claude & Streamlit 🤖*
+        *Vytvořeno v říjnu 2025*
         """)
 
 # Footer
