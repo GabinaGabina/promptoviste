@@ -85,7 +85,7 @@ def save_data_to_github(data, commit_message="Aktualizace promptů z aplikace"):
 
 def analyze_prompt_with_ai(prompt_text):
     """Pošle text promptu do Gemini a získá strukturovaná data."""
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-2.5-flash')
     
     prompt = f"""
     Jsi expertní analytik AI promptů. Přečti si následující text promptu a vytvoř z něj strukturovaný JSON.
@@ -273,6 +273,7 @@ with tab3:
         cats = [p.get('kategorie', 'Nezadáno') for p in prompts]
 
         st.bar_chart({x: cats.count(x) for x in set(cats)})
+
 
 
 
