@@ -46,7 +46,13 @@ def load_data_from_github():
         json_data = contents.decoded_content.decode("utf-8")
         return json.loads(json_data)
     except Exception as e:
-        # Pokud soubor neexistuje nebo je chyba, vrátíme prázdný seznam
+        # TADY JE TA ZMĚNA: Vypíšeme chybu přímo na obrazovku!
+        st.error(f"🚨 CHYBA V SOUBORU JSON: {e}")
+        # Pro jistotu vypíšeme i kus toho textu, co se stáhnul, abychom viděli, co čteme
+        try:
+             st.text(f"Ukázka stažených dat: {json_data[:200]}...")
+        except:
+             pass
         return []
 
 def save_data_to_github(data, commit_message="Aktualizace promptů z aplikace"):
@@ -265,4 +271,5 @@ with tab2:
     st.metric("Celkem promptů", len(prompts))
     if prompts:
         cats = [p.get('kategorie', 'Nezadáno') for p in prompts]
+
         st.bar_chart(json.dumps({x:cats.count(x) for x in set(cats)}))
