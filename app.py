@@ -194,7 +194,7 @@ with tab1:
 
 # --- ZÁLOŽKA 2: PŘIDÁNÍ PROMPTU (ADMIN + AI) ---
 if st.session_state.admin_logged_in:
-    with tab3:
+    with tab2:
         st.header("✨ Přidat nový prompt s AI")
         
         # Session state pro formulář (aby se nevymazal při AI generování)
@@ -267,10 +267,11 @@ if st.session_state.admin_logged_in:
                             st.rerun()
 
 # --- ZÁLOŽKA 3: STATISTIKY (Jen pro ukázku nového vzhledu) ---
-with tab2:
+with tab3:
     st.metric("Celkem promptů", len(prompts))
     if prompts:
         cats = [p.get('kategorie', 'Nezadáno') for p in prompts]
 
         st.bar_chart({x: cats.count(x) for x in set(cats)})
+
 
