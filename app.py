@@ -272,4 +272,5 @@ with tab2:
     if prompts:
         cats = [p.get('kategorie', 'Nezadáno') for p in prompts]
 
-        st.bar_chart(json.dumps({x:cats.count(x) for x in set(cats)}))
+        st.bar_chart({x: cats.count(x) for x in set(cats)})
+
