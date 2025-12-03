@@ -81,7 +81,6 @@ def analyze_prompt_with_ai(prompt_text):
     """Pošle text promptu do Gemini a získá strukturovaná data."""
     # Používáme model, který jsi nastavila a funguje ti
     model = genai.GenerativeModel('gemini-2.0-flash') 
-    # (Pokud by 2.5 nefungoval, zkus 'gemini-1.5-flash' nebo 'gemini-pro')
     
     # VYLEPŠENÉ ZADÁNÍ PRO AI (aby lépe čistila text)
     prompt = f"""
@@ -151,17 +150,16 @@ with st.sidebar:
 
 st.divider()
 
-# --- LOGIKA ZÁLOŽEK (Tady byla ta chyba) ---
-# Teď definujeme proměnnou tab_stats, která bude fungovat pro všechny
+# --- LOGIKA ZÁLOŽEK ---
 
 if st.session_state.admin_logged_in:
     # Admin má 3 záložky
     tab1, tab2, tab3 = st.tabs(["📚 Procházet prompty", "➕ Přidat prompt (AI Powered)", "📊 Statistiky"])
-    tab_stats = tab3  # Statistiky jsou ve třetím
+    tab_stats = tab3
 else:
     # Návštěvník má 2 záložky
     tab1, tab2 = st.tabs(["📚 Procházet prompty", "📊 Statistiky"])
-    tab_stats = tab2  # Statistiky jsou ve druhém
+    tab_stats = tab2
 
 # --- ZÁLOŽKA 1: PROCHÁZENÍ ---
 with tab1:
@@ -169,7 +167,6 @@ with tab1:
     with col1:
         search = st.text_input("🔍 Hledat...", placeholder="Klíčové slovo...")
     with col2:
-        # Ošetření, aby se nekazilo řazení, když je seznam prázdný
         if prompts:
             all_categories = sorted(list(set([p.get('kategorie', 'Jiné') for p in prompts])))
         else:
@@ -201,6 +198,14 @@ if st.session_state.admin_logged_in:
     with tab2:
         st.header("✨ Přidat nový prompt s AI")
         
+        # Tlačítko pro ruční vyčištění
+        if st.button("🗑️ Vyčistit formulář"):
+            st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
+            # Tady mažeme ten "zaseknutý" text v inputu
+            if "input_text_area" in st.session_state:
+                st.session_state["input_text_area"] = ""
+            st.rerun()
+
         if 'new_prompt_data' not in st.session_state:
             st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
 
@@ -213,7 +218,7 @@ if st.session_state.admin_logged_in:
                 with st.spinner("AI čistí a analyzuje prompt..."):
                     ai_result = analyze_prompt_with_ai(input_text)
                     if ai_result:
-                        st.session_state.new_prompt_data["text"] = ai_result.get("text", input_text) # Zde se uloží už ten očištěný text
+                        st.session_state.new_prompt_data["text"] = ai_result.get("text", input_text)
                         st.session_state.new_prompt_data["nazev"] = ai_result.get("nazev", "")
                         st.session_state.new_prompt_data["kategorie"] = ai_result.get("kategorie", "")
                         st.session_state.new_prompt_data["popis"] = ai_result.get("popis", "")
@@ -231,10 +236,8 @@ if st.session_state.admin_logged_in:
             with col_f1:
                 f_nazev = st.text_input("Název", value=st.session_state.new_prompt_data["nazev"])
                 
-                # Seznam kategorií
                 cats_list = ["Vzdělávání", "Marketing", "Business", "Osobní rozvoj", "Kreativita", "Kariéra", "Technologie", "Zdraví a wellness", "Jiné"]
                 curr_cat = st.session_state.new_prompt_data["kategorie"]
-                # Ošetření indexu, aby to nespadlo, když AI vymyslí něco mimo seznam
                 cat_index = cats_list.index(curr_cat) if curr_cat in cats_list else 8
                 
                 f_kategorie = st.selectbox("Kategorie", cats_list, index=cat_index)
@@ -269,11 +272,14 @@ if st.session_state.admin_logged_in:
                     with st.spinner("Odesílám data do GitHubu..."):
                         if save_data_to_github(st.session_state.prompts):
                             st.success("✅ Uloženo! Data jsou bezpečně v cloudu.")
+                            # RESET DAT
                             st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
+                            # DŮLEŽITÉ: Vymazání vstupního pole z paměti Streamlitu
+                            if "input_text_area" in st.session_state:
+                                st.session_state["input_text_area"] = ""
                             st.rerun()
 
 # --- ZÁLOŽKA: STATISTIKY (Univerzální pro všechny) ---
-# Používáme proměnnou tab_stats, kterou jsme definovali nahoře
 with tab_stats:
     st.metric("Celkem promptů", len(prompts))
     if prompts:
