@@ -46,13 +46,7 @@ def load_data_from_github():
         json_data = contents.decoded_content.decode("utf-8")
         return json.loads(json_data)
     except Exception as e:
-        # TADY JE TA ZMĚNA: Vypíšeme chybu přímo na obrazovku!
-        st.error(f"🚨 CHYBA V SOUBORU JSON: {e}")
-        # Pro jistotu vypíšeme i kus toho textu, co se stáhnul, abychom viděli, co čteme
-        try:
-             st.text(f"Ukázka stažených dat: {json_data[:200]}...")
-        except:
-             pass
+        st.error(f"🚨 CHYBA NAČÍTÁNÍ Z GITHUBU: {e}")
         return []
 
 def save_data_to_github(data, commit_message="Aktualizace promptů z aplikace"):
@@ -85,27 +79,28 @@ def save_data_to_github(data, commit_message="Aktualizace promptů z aplikace"):
 
 def analyze_prompt_with_ai(prompt_text):
     """Pošle text promptu do Gemini a získá strukturovaná data."""
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # Používáme model, který jsi nastavila a funguje ti
+    model = genai.GenerativeModel('gemini-2.0-flash') 
+    # (Pokud by 2.5 nefungoval, zkus 'gemini-1.5-flash' nebo 'gemini-pro')
     
+    # VYLEPŠENÉ ZADÁNÍ PRO AI (aby lépe čistila text)
     prompt = f"""
-    Jsi expertní analytik AI promptů. Přečti si následující text promptu a vytvoř z něj strukturovaný JSON.
+    Jsi expertní editor a analytik AI promptů. Dostaneš surový text zkopírovaný z webové stránky nebo mailu.
     
-    TEXT PROMPTU:
+    SUROVÝ TEXT:
     {prompt_text}
     
-    ÚKOL:
-    1. Vymysli výstižný český 'nazev' (krátký, úderný).
-    2. Vyber jednu 'kategorie' z těchto: Vzdělávání, Marketing, Business, Osobní rozvoj, Kreativita, Kariéra, Technologie, Zdraví a wellness, Jiné.
-    3. Napiš 'popis' (max 2 věty česky, co prompt dělá).
-    4. Navrhni 3-5 relevantních 'tagy' (pole řetězců).
+    TVŮJ ÚKOL (Vrať JSON):
+    1. "nazev": Najdi hlavní název. DŮLEŽITÉ: Ponech ho v ORIGINÁLE (Anglicky), pokud to zní jako název metody (např. 'Pattern Pivot Protocol', 'Life OS Architect'). Nepřekládej do češtiny, pokud by to znělo krkolomně. Pokud název chybí, vymysli krátký český.
+    2. "kategorie": Vyber jednu: Vzdělávání, Marketing, Business, Osobní rozvoj, Kreativita, Kariéra, Technologie, Zdraví a wellness, Jiné.
+    3. "popis": Napiš stručné české shrnutí (1-2 věty), co ten prompt dělá.
+    4. "tagy": Navrhni 3-5 českých tagů (pole řetězců).
+    5. "text": TOTO JE NEJDŮLEŽITĚJŠÍ. Extrahuj POUZE samotný systémový prompt.
+       - Ignoruj úvodní texty, autory, odkazy, ukázky použití ("Example user prompts").
+       - Hledej bloky začínající tagy jako <role>, <context>, <instructions> nebo fráze "You are a...".
+       - Vrať čistý text, který se má vložit do AI, bez okolního balastu.
     
-    Vrať POUZE čistý JSON bez formátování markdownem. Příklad formátu:
-    {{
-        "nazev": "...",
-        "kategorie": "...",
-        "popis": "...",
-        "tagy": ["...", "..."]
-    }}
+    Vrať POUZE čistý JSON bez formátování markdownem.
     """
     
     try:
@@ -156,11 +151,17 @@ with st.sidebar:
 
 st.divider()
 
-# Rozdělení na záložky
+# --- LOGIKA ZÁLOŽEK (Tady byla ta chyba) ---
+# Teď definujeme proměnnou tab_stats, která bude fungovat pro všechny
+
 if st.session_state.admin_logged_in:
+    # Admin má 3 záložky
     tab1, tab2, tab3 = st.tabs(["📚 Procházet prompty", "➕ Přidat prompt (AI Powered)", "📊 Statistiky"])
+    tab_stats = tab3  # Statistiky jsou ve třetím
 else:
+    # Návštěvník má 2 záložky
     tab1, tab2 = st.tabs(["📚 Procházet prompty", "📊 Statistiky"])
+    tab_stats = tab2  # Statistiky jsou ve druhém
 
 # --- ZÁLOŽKA 1: PROCHÁZENÍ ---
 with tab1:
@@ -168,7 +169,11 @@ with tab1:
     with col1:
         search = st.text_input("🔍 Hledat...", placeholder="Klíčové slovo...")
     with col2:
-        all_categories = sorted(list(set([p.get('kategorie', 'Jiné') for p in prompts])))
+        # Ošetření, aby se nekazilo řazení, když je seznam prázdný
+        if prompts:
+            all_categories = sorted(list(set([p.get('kategorie', 'Jiné') for p in prompts])))
+        else:
+            all_categories = []
         cat_filter = st.selectbox("Filtr kategorie", ["Všechny"] + all_categories)
 
     filtered = [
@@ -184,57 +189,61 @@ with tab1:
             st.caption(p.get('popis', ''))
             st.code(p['text'])
             
-            # Moderní zobrazení tagů (Streamlit pills nebo prostý text)
+            # Moderní zobrazení tagů
             if 'tagy' in p and p['tagy']:
                 try:
                     st.pills("Tagy", p['tagy'], selection_mode="multi", key=f"pills_{p['nazev']}")
                 except AttributeError:
-                    # Fallback pro starší verze Streamlitu
                     st.write("🏷️ " + ", ".join(p['tagy']))
 
-# --- ZÁLOŽKA 2: PŘIDÁNÍ PROMPTU (ADMIN + AI) ---
+# --- ZÁLOŽKA 2: PŘIDÁNÍ PROMPTU (POUZE ADMIN) ---
 if st.session_state.admin_logged_in:
     with tab2:
         st.header("✨ Přidat nový prompt s AI")
         
-        # Session state pro formulář (aby se nevymazal při AI generování)
         if 'new_prompt_data' not in st.session_state:
             st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
 
         # 1. Vstup pro text
-        input_text = st.text_area("Vlož sem text promptu:", value=st.session_state.new_prompt_data["text"], height=200, key="input_text_area")
+        input_text = st.text_area("Vlož sem text promptu (klidně i s balastem okolo):", value=st.session_state.new_prompt_data["text"], height=200, key="input_text_area")
         
         # 2. AI Tlačítko
         if st.button("✨ Analyzovat a vyplnit pomocí AI"):
             if input_text:
-                with st.spinner("AI analyzuje prompt..."):
+                with st.spinner("AI čistí a analyzuje prompt..."):
                     ai_result = analyze_prompt_with_ai(input_text)
                     if ai_result:
-                        st.session_state.new_prompt_data["text"] = input_text
+                        st.session_state.new_prompt_data["text"] = ai_result.get("text", input_text) # Zde se uloží už ten očištěný text
                         st.session_state.new_prompt_data["nazev"] = ai_result.get("nazev", "")
                         st.session_state.new_prompt_data["kategorie"] = ai_result.get("kategorie", "")
                         st.session_state.new_prompt_data["popis"] = ai_result.get("popis", "")
                         st.session_state.new_prompt_data["tagy"] = ", ".join(ai_result.get("tagy", []))
-                        st.success("Údaje vyplněny!")
+                        st.success("Údaje vyplněny a text vyčištěn!")
                         st.rerun()
             else:
                 st.warning("Nejdřív vlož text promptu!")
 
         st.markdown("---")
         
-        # 3. Formulář (předvyplněný)
+        # 3. Formulář
         with st.form("add_form"):
             col_f1, col_f2 = st.columns(2)
             with col_f1:
                 f_nazev = st.text_input("Název", value=st.session_state.new_prompt_data["nazev"])
-                f_kategorie = st.selectbox("Kategorie", 
-                                         ["Vzdělávání", "Marketing", "Business", "Osobní rozvoj", "Kreativita", "Kariéra", "Technologie", "Zdraví a wellness", "Jiné"],
-                                         index=0 if not st.session_state.new_prompt_data["kategorie"] else ["Vzdělávání", "Marketing", "Business", "Osobní rozvoj", "Kreativita", "Kariéra", "Technologie", "Zdraví a wellness", "Jiné"].index(st.session_state.new_prompt_data["kategorie"]) if st.session_state.new_prompt_data["kategorie"] in ["Vzdělávání", "Marketing", "Business", "Osobní rozvoj", "Kreativita", "Kariéra", "Technologie", "Zdraví a wellness", "Jiné"] else 8)
+                
+                # Seznam kategorií
+                cats_list = ["Vzdělávání", "Marketing", "Business", "Osobní rozvoj", "Kreativita", "Kariéra", "Technologie", "Zdraví a wellness", "Jiné"]
+                curr_cat = st.session_state.new_prompt_data["kategorie"]
+                # Ošetření indexu, aby to nespadlo, když AI vymyslí něco mimo seznam
+                cat_index = cats_list.index(curr_cat) if curr_cat in cats_list else 8
+                
+                f_kategorie = st.selectbox("Kategorie", cats_list, index=cat_index)
+                
             with col_f2:
                 f_tagy = st.text_input("Tagy (oddělené čárkou)", value=st.session_state.new_prompt_data["tagy"])
             
             f_popis = st.text_area("Popis", value=st.session_state.new_prompt_data["popis"])
-            f_text = st.text_area("Finální text promptu", value=st.session_state.new_prompt_data.get("text", input_text), height=150)
+            f_text = st.text_area("Finální text promptu (k uložení)", value=st.session_state.new_prompt_data.get("text", ""), height=300)
             
             submit = st.form_submit_button("💾 Uložit do GitHubu")
             
@@ -255,25 +264,18 @@ if st.session_state.admin_logged_in:
                         "datum": datetime.now().strftime("%d.%m.%Y")
                     }
                     
-                    # Přidání do lokálního seznamu
                     st.session_state.prompts.append(new_item)
                     
-                    # ULOŽENÍ DO GITHUBU
                     with st.spinner("Odesílám data do GitHubu..."):
                         if save_data_to_github(st.session_state.prompts):
                             st.success("✅ Uloženo! Data jsou bezpečně v cloudu.")
-                            # Reset formuláře
                             st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
                             st.rerun()
 
-# --- ZÁLOŽKA 3: STATISTIKY (Jen pro ukázku nového vzhledu) ---
-with tab3:
+# --- ZÁLOŽKA: STATISTIKY (Univerzální pro všechny) ---
+# Používáme proměnnou tab_stats, kterou jsme definovali nahoře
+with tab_stats:
     st.metric("Celkem promptů", len(prompts))
     if prompts:
         cats = [p.get('kategorie', 'Nezadáno') for p in prompts]
-
         st.bar_chart({x: cats.count(x) for x in set(cats)})
-
-
-
-
