@@ -7,7 +7,6 @@ import google.generativeai as genai
 
 # --- KONFIGURACE A PŘIPOJENÍ ---
 
-# Nastavení stránky
 st.set_page_config(
     page_title="Promptoviště 2.0",
     page_icon="✨",
@@ -26,10 +25,7 @@ except KeyError as e:
     st.error(f"V secrets chybí klíč: {e}")
     st.stop()
 
-# Konfigurace Gemini AI
 genai.configure(api_key=GEMINI_API_KEY)
-
-# Cesta k souboru v repozitáři
 DATA_FILE = "prompty.json"
 
 # --- FUNKCE PRO PRÁCI S GITHUBEM ---
@@ -39,7 +35,6 @@ def get_github_repo():
     return g.get_repo(REPO_NAME)
 
 def load_data_from_github():
-    """Načte JSON přímo z GitHubu."""
     try:
         repo = get_github_repo()
         contents = repo.get_contents(DATA_FILE)
@@ -50,10 +45,8 @@ def load_data_from_github():
         return []
 
 def save_data_to_github(data, commit_message="Aktualizace promptů z aplikace"):
-    """Uloží JSON přímo do GitHubu (commit)."""
     repo = get_github_repo()
     try:
-        # Zkusíme soubor najít, abychom získali jeho SHA (nutné pro update)
         contents = repo.get_contents(DATA_FILE)
         repo.update_file(
             path=contents.path,
@@ -63,7 +56,6 @@ def save_data_to_github(data, commit_message="Aktualizace promptů z aplikace"):
         )
         return True
     except GithubException as e:
-        # Pokud soubor neexistuje, vytvoříme ho
         if e.status == 404:
             repo.create_file(
                 path=DATA_FILE,
@@ -78,33 +70,26 @@ def save_data_to_github(data, commit_message="Aktualizace promptů z aplikace"):
 # --- FUNKCE PRO GEMINI AI ---
 
 def analyze_prompt_with_ai(prompt_text):
-    """Pošle text promptu do Gemini a získá strukturovaná data."""
-    # Používáme model, který jsi nastavila a funguje ti
     model = genai.GenerativeModel('gemini-2.0-flash') 
     
-    # VYLEPŠENÉ ZADÁNÍ PRO AI (aby lépe čistila text)
     prompt = f"""
-    Jsi expertní editor a analytik AI promptů. Dostaneš surový text zkopírovaný z webové stránky nebo mailu.
+    Jsi expertní editor a analytik AI promptů. Dostaneš surový text.
     
     SUROVÝ TEXT:
     {prompt_text}
     
     TVŮJ ÚKOL (Vrať JSON):
-    1. "nazev": Najdi hlavní název. DŮLEŽITÉ: Ponech ho v ORIGINÁLE (Anglicky), pokud to zní jako název metody (např. 'Pattern Pivot Protocol', 'Life OS Architect'). Nepřekládej do češtiny, pokud by to znělo krkolomně. Pokud název chybí, vymysli krátký český.
+    1. "nazev": Najdi hlavní název. Ponech ho v ORIGINÁLE (Anglicky), pokud to zní jako název metody. Jinak krátký český.
     2. "kategorie": Vyber jednu: Vzdělávání, Marketing, Business, Osobní rozvoj, Kreativita, Kariéra, Technologie, Zdraví a wellness, Jiné.
-    3. "popis": Napiš stručné české shrnutí (1-2 věty), co ten prompt dělá.
+    3. "popis": Napiš stručné české shrnutí (1-2 věty).
     4. "tagy": Navrhni 3-5 českých tagů (pole řetězců).
-    5. "text": TOTO JE NEJDŮLEŽITĚJŠÍ. Extrahuj POUZE samotný systémový prompt.
-       - Ignoruj úvodní texty, autory, odkazy, ukázky použití ("Example user prompts").
-       - Hledej bloky začínající tagy jako <role>, <context>, <instructions> nebo fráze "You are a...".
-       - Vrať čistý text, který se má vložit do AI, bez okolního balastu.
+    5. "text": Extrahuj POUZE samotný systémový prompt. Ignoruj úvodní texty a příklady. Hledej bloky <role>, <context>, You are a...
     
-    Vrať POUZE čistý JSON bez formátování markdownem.
+    Vrať POUZE čistý JSON.
     """
     
     try:
         response = model.generate_content(prompt)
-        # Očištění odpovědi od případných ```json značek
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
         return json.loads(clean_text)
     except Exception as e:
@@ -113,31 +98,32 @@ def analyze_prompt_with_ai(prompt_text):
 
 # --- HLAVNÍ APLIKACE ---
 
-# Inicializace session state
 if 'prompts' not in st.session_state:
     st.session_state.prompts = load_data_from_github()
 
 if 'admin_logged_in' not in st.session_state:
     st.session_state.admin_logged_in = False
 
-# Refresh data tlačítko (pro jistotu)
+# TRIK: Počítadlo pro resetování formuláře
+if 'form_id' not in st.session_state:
+    st.session_state.form_id = 0
+
 if st.sidebar.button("🔄 Načíst čerstvá data z GitHubu"):
     st.session_state.prompts = load_data_from_github()
     st.rerun()
 
 prompts = st.session_state.prompts
 
-# Hlavička
 st.title("✨ Promptoviště 2.0")
 st.markdown("*Chytrá databáze promptů, která se ukládá přímo do cloudu.*")
 
-# Admin login v postranním panelu
+# Admin login
 with st.sidebar:
     st.header("🔐 Admin zóna")
     if not st.session_state.admin_logged_in:
         admin_password = st.text_input("Heslo", type="password", key="admin_pass")
         if st.button("Přihlásit"):
-            if admin_password == "promptmaster": # Změň si heslo dle potřeby
+            if admin_password == "promptmaster": 
                 st.session_state.admin_logged_in = True
                 st.rerun()
             else:
@@ -150,14 +136,11 @@ with st.sidebar:
 
 st.divider()
 
-# --- LOGIKA ZÁLOŽEK ---
-
+# Logika záložek
 if st.session_state.admin_logged_in:
-    # Admin má 3 záložky
     tab1, tab2, tab3 = st.tabs(["📚 Procházet prompty", "➕ Přidat prompt (AI Powered)", "📊 Statistiky"])
     tab_stats = tab3
 else:
-    # Návštěvník má 2 záložky
     tab1, tab2 = st.tabs(["📚 Procházet prompty", "📊 Statistiky"])
     tab_stats = tab2
 
@@ -186,7 +169,6 @@ with tab1:
             st.caption(p.get('popis', ''))
             st.code(p['text'])
             
-            # Moderní zobrazení tagů
             if 'tagy' in p and p['tagy']:
                 try:
                     st.pills("Tagy", p['tagy'], selection_mode="multi", key=f"pills_{p['nazev']}")
@@ -198,19 +180,24 @@ if st.session_state.admin_logged_in:
     with tab2:
         st.header("✨ Přidat nový prompt s AI")
         
-        # Tlačítko pro ruční vyčištění
-        if st.button("🗑️ Vyčistit formulář"):
-            st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
-            # BEZPEČNÉ MAZÁNÍ - Místo přepisování klíč úplně odstraníme
-            if "input_text_area" in st.session_state:
-                del st.session_state["input_text_area"]
-            st.rerun()
-
+        # Inicializace dat
         if 'new_prompt_data' not in st.session_state:
             st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
 
-        # 1. Vstup pro text
-        input_text = st.text_area("Vlož sem text promptu (klidně i s balastem okolo):", value=st.session_state.new_prompt_data["text"], height=200, key="input_text_area")
+        # Tlačítko pro ruční vyčištění
+        if st.button("🗑️ Vyčistit formulář"):
+            st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
+            st.session_state.form_id += 1  # Změníme ID, tím se resetuje pole
+            st.rerun()
+
+        # 1. Vstup pro text s DYNAMICKÝM KLÍČEM
+        # Díky f"..._{st.session_state.form_id}" se při každé změně ID vytvoří nové čisté pole
+        input_text = st.text_area(
+            "Vlož sem text promptu (klidně i s balastem okolo):", 
+            value=st.session_state.new_prompt_data["text"], 
+            height=200, 
+            key=f"input_text_area_{st.session_state.form_id}"
+        )
         
         # 2. AI Tlačítko
         if st.button("✨ Analyzovat a vyplnit pomocí AI"):
@@ -223,6 +210,8 @@ if st.session_state.admin_logged_in:
                         st.session_state.new_prompt_data["kategorie"] = ai_result.get("kategorie", "")
                         st.session_state.new_prompt_data["popis"] = ai_result.get("popis", "")
                         st.session_state.new_prompt_data["tagy"] = ", ".join(ai_result.get("tagy", []))
+                        
+                        st.session_state.form_id += 1 # Resetujeme pole, aby se načetla nová data z value
                         st.success("Údaje vyplněny a text vyčištěn!")
                         st.rerun()
             else:
@@ -246,12 +235,12 @@ if st.session_state.admin_logged_in:
                 f_tagy = st.text_input("Tagy (oddělené čárkou)", value=st.session_state.new_prompt_data["tagy"])
             
             f_popis = st.text_area("Popis", value=st.session_state.new_prompt_data["popis"])
+            # I tady musíme zajistit, aby se zobrazil vyčištěný text
             f_text = st.text_area("Finální text promptu (k uložení)", value=st.session_state.new_prompt_data.get("text", ""), height=300)
             
             submit = st.form_submit_button("💾 Uložit do GitHubu")
             
             if submit:
-                # Kontrola duplicit
                 is_duplicate = any(p['nazev'].lower() == f_nazev.lower() for p in st.session_state.prompts)
                 if is_duplicate:
                     st.error(f"⚠️ Prompt s názvem '{f_nazev}' už existuje! Zvol jiný název.")
@@ -272,14 +261,12 @@ if st.session_state.admin_logged_in:
                     with st.spinner("Odesílám data do GitHubu..."):
                         if save_data_to_github(st.session_state.prompts):
                             st.success("✅ Uloženo! Data jsou bezpečně v cloudu.")
-                            # RESET DAT
+                            # RESET: Vymažeme data a zvýšíme ID, což vynutí překreslení prázdných polí
                             st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
-                            # BEZPEČNÉ MAZÁNÍ - Odstranění klíče z session state
-                            if "input_text_area" in st.session_state:
-                                del st.session_state["input_text_area"]
+                            st.session_state.form_id += 1
                             st.rerun()
 
-# --- ZÁLOŽKA: STATISTIKY (Univerzální pro všechny) ---
+# --- ZÁLOŽKA: STATISTIKY ---
 with tab_stats:
     st.metric("Celkem promptů", len(prompts))
     if prompts:
