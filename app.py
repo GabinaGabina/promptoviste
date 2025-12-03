@@ -201,9 +201,9 @@ if st.session_state.admin_logged_in:
         # Tlačítko pro ruční vyčištění
         if st.button("🗑️ Vyčistit formulář"):
             st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
-            # Tady mažeme ten "zaseknutý" text v inputu
+            # BEZPEČNÉ MAZÁNÍ - Místo přepisování klíč úplně odstraníme
             if "input_text_area" in st.session_state:
-                st.session_state["input_text_area"] = ""
+                del st.session_state["input_text_area"]
             st.rerun()
 
         if 'new_prompt_data' not in st.session_state:
@@ -274,9 +274,9 @@ if st.session_state.admin_logged_in:
                             st.success("✅ Uloženo! Data jsou bezpečně v cloudu.")
                             # RESET DAT
                             st.session_state.new_prompt_data = {"nazev": "", "kategorie": "", "popis": "", "tagy": "", "text": ""}
-                            # DŮLEŽITÉ: Vymazání vstupního pole z paměti Streamlitu
+                            # BEZPEČNÉ MAZÁNÍ - Odstranění klíče z session state
                             if "input_text_area" in st.session_state:
-                                st.session_state["input_text_area"] = ""
+                                del st.session_state["input_text_area"]
                             st.rerun()
 
 # --- ZÁLOŽKA: STATISTIKY (Univerzální pro všechny) ---
